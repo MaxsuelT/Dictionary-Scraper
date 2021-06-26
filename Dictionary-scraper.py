@@ -27,22 +27,24 @@ def getWord(word):
     Initial set up
 """
 # Type the word you are looking for here
-soup = getWord('hello')
+soup = getWord('amazing')
 
 body = soup.find('body')
 DictEntry = body.find_all('span', class_='dictentry')
 
-def findTag(obj, tag, cl, lmt=None):
-    if lmt:
-        try:
-            return obj.find_all(tag, class_=cl, limit=lmt)
-        except AttributeError as e:
-            print(e)
-    else:
-        try:
-            return obj.find(tag, class_=cl)
-        except AttributeError as e:
-            print(e)
+
+unwantedTags = ['script', 'noscript', 'img']
+unwantedClasses = ['header', 'responsive_cell2','topslot-container','footer', 'etym']
+unwantedId = ["ad_leftslot_container"]
+
+
+def decompose_(tag=None, cl=None, id_=None):
+    [tg.decompose() for tg in body.find_all(tag, class_=cl, id=id_)]
+
+
+decompose_(unwantedTags)
+decompose_('div', unwantedClasses)
+decompose_('div',None, unwantedId)
 
 def getDict(obj, name):
     output = {}
@@ -50,26 +52,43 @@ def getDict(obj, name):
         output[name + str(idx + 1)] = val
     return output
 
-
-unwantedTags = ['script', 'noscript', 'img', 'header']
-unwantedClasses = ['header', 'responsive_cell2','topslot-container','footer', 'etym']
-unwantedDivs = ["ad_leftslot_container"]
-def decompose_(tag, cssClass, ids):
-    if tag:
-        [tg.decompose() for tg in body.find_all(tag)]
-    if cssClass:
-        [cl.decompose() for cl in body.find_all(class_=cssClass)]
-    if ids:
-        [cl.decompose() for cl in body.find_all(id=ids)]
+def getAudio(obj, name, tag, cl, lmt):
+    result = []
+    for audio in obj:
+        resultSet = audio.find_all(tag, class_=cl, limit=lmt)
+        for elem in resultSet:
+            result.append(elem.get('data-src-mp3', -1))
+            output = getDict(result, name)
+    
+    return output
 
 
-decompose_(unwantedTags, unwantedClasses, unwantedDivs)
+def getGrPos(obj, name, tag, cl, lmt=None):
+    result = []
+    for elem in obj:
+        strings = elem.find(tag, class_=cl).get_text(strip=True)
+        result.append(strings)
+        output = getDict(result, name)
+    return output
+
+
+def getExamples(obj,name, tag, cl, lmt=None):
+    result = []
+    for exp in obj:
+        ResultSet = exp.find_all(tag, class_=cl, limit=lmt)
+        for elem in ResultSet:
+            result.append(elem.get_text())
+            result = [string.strip() for string in result]
+            output = getDict(result, name) 
+    return output
+
 
 """
     Title, Pronounciation
 """
-title = body.find('h1', 'pagetitle').get_text()
-pron = body.find('span','PRON').get_text() 
+
+title = body.find('h1', class_='pagetitle').get_text()
+pron = body.find('span',class_='PRON').get_text() 
 print('Definition of the word: ', title.title())
 print('\nPronounciation: ', pron)
 
@@ -78,38 +97,27 @@ print('\nPronounciation: ', pron)
     Audio 
 """
 
-def getAudio(obj, name, tag, cl, lmt):
-    result = []
-    for exp in obj:
-        ResultSet = findTag(exp,tag,cl, lmt)
-        for elem in ResultSet:
-            result.append(elem.get('data-src-mp3', -1))
-            output = getDict(result, name)
-    
-    return output
+AUDIOBRE = 'speaker brefile fas fa-volume-up hideOnAmp'
+AUDIOAME = 'speaker amefile fas fa-volume-up hideOnAmp'
+EXAMPLE = 'speaker exafile fas fa-volume-up hideOnAmp'
 
-audioBre = 'speaker brefile fas fa-volume-up hideOnAmp'
-audioAme = 'speaker amefile fas fa-volume-up hideOnAmp'
+try:
+    pronLinks = getAudio(DictEntry, 
+                'Example ', 'span',{AUDIOAME, AUDIOBRE}, 2)
+    print('\nPronounciation: ', pronLinks)
+except AttributeError:
+    pass
 
-pronLinks = getAudio(DictEntry, 
-                    'Example ', 'span',{audioAme, audioBre}, 2)
-
-print('\nPronounciation: ', pronLinks)
-
-adExp = 'speaker exafile fas fa-volume-up hideOnAmp'
-audioExamples = getAudio(DictEntry, 'Example', 'span', adExp, 2)
-print('\nAudioExamples: ', audioExamples)
+try: 
+    audioExamples = getAudio(DictEntry, 'Example', 'span', EXAMPLE, 2)
+    print('\nAudioExamples: ', audioExamples)
+except AttributeError:
+    pass
 
 """
      Grammar, Parts of speech
 """
-def getGrPos(obj, name, tag, cl, lmt=None):
-    result = []
-    for elem in obj:
-        strings = findTag(elem, tag, cl, lmt).get_text(strip=True)
-        result.append(strings)
-        output = getDict(result, name)
-    return output
+
 
 try:
     grm = getGrPos(DictEntry,'Grammar', 'span', 'GRAM')
@@ -122,20 +130,11 @@ try:
     print('\nParts of speech', pos)
 except AttributeError:
     pass
+
+
 """
     Definition and examples
 """
-
-def getExamples(obj,name, tag, cl, lmt=None):
-    result = []
-    for exp in obj:
-        ResultSet = findTag(exp,tag,cl, lmt)
-        for elem in ResultSet:
-            result.append(elem.get_text())
-            result = [string.strip() for string in result]
-            output = getDict(result, name) 
-    return output
-
 
 try:
     defs = getExamples(DictEntry, 'Definition ',  'span', 'DEF', 2)
